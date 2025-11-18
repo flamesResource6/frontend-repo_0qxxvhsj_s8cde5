@@ -1,22 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
-// Lazy-load Spline to avoid hard crashes if the environment lacks WebGL or the module fails to init
+// Lazy-load Spline with robust guards and an opt-out flag (?no3d=1)
 const Hero = () => {
   const [SplineComp, setSplineComp] = useState(null);
   const [splineError, setSplineError] = useState(false);
+  const [no3D, setNo3D] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const disable3d = params.get('no3d') === '1' || params.get('no3d') === 'true';
+    const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (disable3d || prefersReducedMotion) {
+      setNo3D(true);
+      setSplineError(true);
+      return;
+    }
+
     let mounted = true;
+    let timeoutId;
+
+    // Safety timeout: if module import hangs, show graceful fallback
+    timeoutId = setTimeout(() => {
+      if (mounted && !SplineComp) setSplineError(true);
+    }, 4000);
+
     import('@splinetool/react-spline')
       .then((mod) => {
         if (mounted) setSplineComp(() => mod.default);
       })
       .catch(() => {
         if (mounted) setSplineError(true);
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
       });
+
     return () => {
       mounted = false;
+      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -32,7 +54,16 @@ const Hero = () => {
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950">
             <div className="text-center">
               <div className="mx-auto mb-4 h-14 w-14 animate-pulse rounded-full bg-sky-500/30" />
-              <p className="text-sky-200/80">{splineError ? 'Interactive background unavailable on this device.' : 'Loading experience...'}</p>
+              <p className="text-sky-200/80">
+                {no3D
+                  ? '3D disabled for this session.'
+                  : splineError
+                    ? 'Interactive background unavailable on this device.'
+                    : 'Loading experience...'}
+              </p>
+              <div className="mt-4 text-xs text-sky-300/80">
+                <a href="/?no3d=1" className="underline hover:text-white">Load without 3D</a>
+              </div>
             </div>
           </div>
         )}
