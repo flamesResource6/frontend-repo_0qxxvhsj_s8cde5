@@ -1,12 +1,41 @@
-import React from 'react';
-import Spline from '@splinetool/react-spline';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
+// Lazy-load Spline to avoid hard crashes if the environment lacks WebGL or the module fails to init
 const Hero = () => {
+  const [SplineComp, setSplineComp] = useState(null);
+  const [splineError, setSplineError] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    import('@splinetool/react-spline')
+      .then((mod) => {
+        if (mounted) setSplineComp(() => mod.default);
+      })
+      .catch(() => {
+        if (mounted) setSplineError(true);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <section className="relative h-[90vh] w-full overflow-hidden bg-slate-950 text-white">
       <div className="absolute inset-0">
-        <Spline scene="https://prod.spline.design/2fSS9b44gtYBt4RI/scene.splinecode" style={{ width: '100%', height: '100%' }} />
+        {SplineComp && !splineError ? (
+          <SplineComp
+            scene="https://prod.spline.design/2fSS9b44gtYBt4RI/scene.splinecode"
+            style={{ width: '100%', height: '100%' }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950">
+            <div className="text-center">
+              <div className="mx-auto mb-4 h-14 w-14 animate-pulse rounded-full bg-sky-500/30" />
+              <p className="text-sky-200/80">{splineError ? 'Interactive background unavailable on this device.' : 'Loading experience...'}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Gradient overlays for readability */}
